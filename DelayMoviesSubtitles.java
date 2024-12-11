@@ -4,92 +4,43 @@ import java.io.FileWriter;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.io.FileNotFoundException;
-
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class DelayMoviesSubtitles {
 
 	private final static String ADVANCE = "advance";
-		private final static String DELAY = "delay";
+	private final static String DELAY = "delay";
 	 
-
-	    private String composeIntervalLine(Matcher matcher, String seconds, String advanceDelay){
-	    	String finalLine = delayTime(matcher, 3, seconds, advanceDelay);
-	    	finalLine += matcher.group(4); 
-	    	finalLine += delayTime(matcher, 7, seconds, advanceDelay);
-	    	finalLine += matcher.group(8);
-	    	return finalLine;
-	    }
+    
+		/**
+		 * Crea una linea de rango temporal del subtítulo la cual tiene el formato:
+		 *      hh:mm:ss,zzz --> hh:mm:ss,zzz  
+		 *(Horas_pelicula:minutos_pelicula:segundos,milisegundos INICIO --> Horas_pelicula:minutos_pelicula:segundos,milisegundos FINAL) 
+		 * @param matcher Patrón expresiones regulares de una linea con la anterior
+		 * @param seconds
+		 * @param delayOrAdvance
+		 * @return
+		 */		
+	    private String createTimeIntervalLine(Matcher matcher, long seconds, String delayOrAdvance) {
+	    	return new StringBuffer( calculateDelayOrAdvanceTime(matcher.group(1), seconds, delayOrAdvance))
+	    			.append(matcher.group(2))
+	    			.append(calculateDelayOrAdvanceTime(matcher.group(3), seconds, delayOrAdvance)).toString();	    			
+	    }	    
 	    
-		private String delayTime(Matcher matcher, int j, String secondsStr, String advanceDelay) {
-			String instantString= "", timeUnitString ="";
-			int seconds = Integer.parseInt(secondsStr);
-			boolean minutes_1 = false, horas_1 = false;
-			for (int i=j; i>=j-2;i--){
-				String group = matcher.group(i);
-				int timeUnit = Integer.parseInt(group);
-				if (i==j){
-					if (advanceDelay.equals(DELAY)){
-						if (timeUnit < seconds){
-							timeUnit += 60;
-							minutes_1 = true;
-						}
-						timeUnit -= seconds;
-					}else{
-						timeUnit += seconds;
-						if (timeUnit>= 60){
-							timeUnit -= 60;
-							minutes_1 = true;
-						}
-					}
-					timeUnitString = unitTimeFromIntToString(timeUnit);
-					instantString = timeUnitString; 
-				}
-				if (i==j-1) {
-					if (minutes_1){
-						if (advanceDelay.equals(DELAY)){
-							if (timeUnit==0){
-								timeUnit=59;
-								horas_1 = true;
-							}
-							else
-								timeUnit -= 1;
-						}else{
-							if (timeUnit==59){
-								timeUnit=0;
-								horas_1 = true;
-							}
-							else
-								timeUnit += 1;							
-						}
-					}
-					timeUnitString = unitTimeFromIntToString(timeUnit);
-					instantString = timeUnitString + ":"+ instantString;
-				}
-				if (i==j-2) {
-					if (horas_1){
-						if (advanceDelay.equals(DELAY))
-							timeUnit -=1;
-						else
-							timeUnit +=1;
-					}
-					timeUnitString = unitTimeFromIntToString(timeUnit);
-					instantString = timeUnitString + ":"+ instantString;
-				}
-			}
-			return instantString;
-		}
-		
-		private String unitTimeFromIntToString(int timeUnit){
-			String finalTimeString = "";
-			if (timeUnit<10){
-				finalTimeString= "0"+ Integer.toString(timeUnit);
-			}else{
-				finalTimeString= Integer.toString(timeUnit);
-			}
-			return finalTimeString;
+	    
+	    private String calculateDelayOrAdvanceTime(String timeStr, long seconds, String delayOrAdvance) {
+	    	DateTimeFormatter dtFormatter = DateTimeFormatter.ofPattern("HH:mm:ss,SSS");
+	    	LocalTime localTime = LocalTime.parse(timeStr, dtFormatter);	    	
+	    	if (delayOrAdvance.equals(DELAY)) { //retrasar el subtitulo implica sumar "n" segundos al tiempo	    		
+	    		localTime = localTime.plusSeconds(seconds);
+	    	}else{				//adelantar el subtitulo implica restar "n" segundos al tiempo
+	    		localTime = localTime.minusSeconds(seconds);
+	    	}
+	    	return localTime.format(dtFormatter);	    		
 		}
 		
 		
@@ -100,14 +51,14 @@ public class DelayMoviesSubtitles {
 		/**		
 		 * @doc args[0] : Nombre de archivo de entrada de Subtitulos STRING
 		 * @doc args[1] : Nombre de archivo de salida de Subtitulos ( el de entrada ya modificado) STRING
-		 * @doc args[2] : Segundos a adelantar o atrasar el archivo INTEGER		 
+		 * @doc args[2] : Segundos a adelantar o atrasar los subtitulos del archivo INTEGER		 
 		 * @doc args[3] : adelantar o retrasar ("advance" o "delay") 
 		 * @param args  
 		 */
 			    public DelayMoviesSubtitles(String[] args) {
 			        String filenameIn = args[0];
 			        String filenameOut = args[1];
-			        String seconds = args[2];
+			        String secondsStr = args[2];
 			        String advanceDelay = args[3];
 			        String line = null;
 			        FileReader reader = null;
@@ -127,16 +78,17 @@ public class DelayMoviesSubtitles {
 					 */
 			        BufferedReader buffer = new BufferedReader(reader, 1000);
 			        BufferedWriter bufferWriter = new BufferedWriter(writer, 1000);
-			        Pattern pattern1 = Pattern.compile("(\\d{2}):(\\d{2}):(\\d{2})(,\\d{3}\\s-->\\s)(\\d{2}):(\\d{2}):(\\d{2})(,\\d{3})");
+			        Pattern pattern = Pattern.compile("(\\d{2}:\\d{2}:\\d{2},\\d{3})(\\s-->\\s)(\\d{2}:\\d{2}:\\d{2},\\d{3})");
 			        int linesModified =0, linesNotModified=0;
+			        long seconds = Long.parseLong((secondsStr==null || secondsStr.equals("")) ? "0" : secondsStr);
 			        try{
 			            do { 
 			                    line = buffer.readLine();
 			                    if (line!=null){
-				                    Matcher matcher1 = pattern1.matcher(line);
-				                    if (matcher1.matches()){
+				                    Matcher matcher = pattern.matcher(line);
+				                    if (matcher.matches()){
 				                    	System.out.println("line is matched:"+line);
-				                    	line = composeIntervalLine(matcher1, seconds, advanceDelay);
+				                    	line = createTimeIntervalLine(matcher, seconds, advanceDelay);
 				                    	linesModified++;
 				                    }else{
 				                    	linesNotModified++;
@@ -159,13 +111,13 @@ public class DelayMoviesSubtitles {
 			            System.out.println("Lineas modificadas: "+linesModified);
 			            System.out.println("Lineas no modificadas: "+linesNotModified);
 			        }
-			    }
-			    
-			    /**
+			    }    
+
+
+				/**
 			     * @param args the command line arguments
 			     */
 			    public static void main(String[] args) {
 			    	new DelayMoviesSubtitles(args);
 			    }		
-
 }

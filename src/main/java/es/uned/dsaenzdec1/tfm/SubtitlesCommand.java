@@ -67,9 +67,9 @@ public class SubtitlesCommand implements Callable<Integer> {
     }	 		
 
 	    
-	/** TODO: Que admita segundos negativos en args[2], con lo que args[3] se ignorar�		
-		TODO: Nuevos par�metros args[4] y args[5] para delimitar un rango de tiempo en formato HH:MM:SS 
-		en el que se aplicar� la modificaci�n
+	/** TODO: Que admita segundos negativos en args[2], con lo que args[3] se ignorarán		
+		TODO: Nuevos parámetros args[4] y args[5] para delimitar un rango de tiempo en formato HH:MM:SS 
+		en el que se aplicará la modificación.
 	 */ 
 	@Override
 	public Integer call() throws Exception {

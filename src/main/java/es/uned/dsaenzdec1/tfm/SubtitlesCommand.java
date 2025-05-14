@@ -23,16 +23,16 @@ import org.springframework.stereotype.Component;
 @Command(name="DelayOrAdvanceSubtitles", version="1.0", mixinStandardHelpOptions = true, description="Pequeño programa que inicialmente sirve para avanzar o retrasar subtitulos")
 public class SubtitlesCommand implements Callable<Integer> {
 
-    @Option(names = { "-i", "--filenameIn" }, paramLabel = "ARCHIVO DE SUBTITULOS DE ENTRADA", description = "Archivo con subtitulos de entrada")
+    @Option(required = true, names = { "-i", "--filenameIn" }, paramLabel = "ARCHIVO DE SUBTITULOS DE ENTRADA", description = "Archivo con subtitulos de entrada")
     File filenameIn;
     
     @Option(names = { "-o", "--filenameOut" }, paramLabel = "ARCHIVO DE SUBTITULOS DE SALIDA", description = "Archivo de salida con subtitulos procesados")
     File filenameOut;
     
-    @Option(names={"-s", "--seconds"}, paramLabel="SEGUNDOS", description="Cantidad de segundos de adelanto o de retraso")
+    @Option(required = true, names={"-s", "--seconds"}, paramLabel="SEGUNDOS", description="Cantidad de segundos de adelanto o de retraso")
     Optional<Long> seconds;
     
-    @Option(names={"-d", "--direction"}, paramLabel="DIRECCION", description="Si los subtitulos se avanzan o se retrasan") 
+    @Option(required = true, names={"-d", "--direction"}, paramLabel="DIRECCION", description="Si los subtitulos se avanzan o se retrasan") 
     Optional<Direction> advanceDelay;
     
 	private enum Direction {
@@ -78,6 +78,11 @@ public class SubtitlesCommand implements Callable<Integer> {
         FileWriter writer = null;
 		try {
 			reader = new FileReader(filenameIn);
+			String filenameOutName;
+			if (filenameOut==null) {
+				filenameOutName = filenameIn.getName().substring(0, filenameIn.getName().lastIndexOf(".")).concat("_2.srt");
+				filenameOut = new File(filenameOutName);
+			}
 			filenameOut.createNewFile();				
 			writer = new FileWriter(filenameOut);
 		} catch (FileNotFoundException e1) {

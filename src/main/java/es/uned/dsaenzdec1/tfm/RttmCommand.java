@@ -33,8 +33,9 @@ public class RttmCommand implements Callable<Integer> {
     @Option(names = { "-o", "--filenameOut" }, paramLabel = "ARCHIVO RTTM DE DIARIZACIÓN DE SALIDA", description = "Archivo de salida con la diarización procesada")
     File filenameOut;
     
-	Boolean isVtt;    	
-	Long deltaHiper = 50l;
+	//Boolean isVtt;    	
+    @Option(required = true, names = { "-d", "--delta" }, paramLabel = "PARAM. DE SEGMENTACIÓN", description = "Hiperparametro para segmentación entre speechs")  
+	Long deltaHiper;
 		
 	LocalTime previousLocalTimeBegin = null;
 	LocalTime previousLocalTimeEnd = null;
@@ -44,7 +45,10 @@ public class RttmCommand implements Callable<Integer> {
 	Long currentSpeechMillis = 0l;
 	
 	String previousSpeaker = null;
-	String currentSpeaker = null;
+	String currentSpeaker = null;	
+	boolean firstSpeaker = false;
+	
+	String filenameWithoutExtension;
 	
 	final static String NARRADOR = "NARRADOR";
 	final static String SPEAKER = "SPEAKER";
@@ -62,8 +66,7 @@ public class RttmCommand implements Callable<Integer> {
 		VOZ_BAJA2("EN VOZ BAJA"),
 		VOZ_ALTA("VOZ ALTA"),
 		VOZ_ALTA2("EN VOZ ALTA");
-		
-		
+				
 		String fc;
 		public String getFc() {return this.fc;}
 		
@@ -73,12 +76,7 @@ public class RttmCommand implements Callable<Integer> {
 			 return Arrays.stream(FormasHablar.values()).map(fc -> fc.getFc()).collect(Collectors.joining("|"));
 		}
 	}
-	
-
-	boolean firstSpeaker = false;
-	final static boolean SAME= Boolean.TRUE, DIFFERENT= Boolean.FALSE;
-	String filenameWithoutExtension; 
-
+	 
 
 	/**
 	 * Produce una linea de texto RTTM en el archivo de salida
@@ -169,7 +167,7 @@ public class RttmCommand implements Callable<Integer> {
 		try {
 			reader = new FileReader(filenameIn);
 			filenameWithoutExtension = filenameIn.getName().substring(0, filenameIn.getName().lastIndexOf("."));
-			isVtt = filenameIn.getName().toLowerCase().endsWith(".vtt");
+			//isVtt = filenameIn.getName().toLowerCase().endsWith(".vtt");
 			filenameOut.createNewFile();				
 			writer = new FileWriter(filenameOut);
 		} catch (FileNotFoundException e1) {

@@ -9,7 +9,6 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.FileNotFoundException;
-
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoField;
@@ -24,7 +23,7 @@ import org.springframework.stereotype.Component;
 import org.apache.commons.lang3.*;
 
 @Component
-@Command(name="Diarization", version="1.0", mixinStandardHelpOptions = true, description="Pequeño programa que inicialmente sirve para avanzar o retrasar subtitulos")
+@Command(name="Convert Subtitles to RTTM Files", version="1.0", mixinStandardHelpOptions = true, description="Este comando convierte archivos de formato .srt o .vtt a formato .rttm para diarización")
 public class RttmCommand implements Callable<Integer> {
 
     @Option(names = { "-i", "--filenameIn" }, paramLabel = "ARCHIVO DE SUBTITULOS DE ENTRADA", description = "Archivo con subtitulos de entrada")
@@ -32,23 +31,22 @@ public class RttmCommand implements Callable<Integer> {
     
     @Option(names = { "-o", "--filenameOut" }, paramLabel = "ARCHIVO RTTM DE DIARIZACIÓN DE SALIDA", description = "Archivo de salida con la diarización procesada")
     File filenameOut;
-    
-	//Boolean isVtt;    	
+        	
     @Option(required = true, names = { "-d", "--delta" }, paramLabel = "PARAM. DE SEGMENTACIÓN", description = "Hiperparametro para segmentación entre speechs")  
 	Long deltaHiper;
 		
-	LocalTime previousLocalTimeBegin = null;
-	LocalTime previousLocalTimeEnd = null;
-	Long previousSpeechMillis = 0l;
-	LocalTime currentLocalTimeBegin = null;
-	LocalTime currentLocalTimeEnd = null;	
-	Long currentSpeechMillis = 0l;
-	
-	String previousSpeaker = null;
-	String currentSpeaker = null;	
-	boolean firstSpeaker = false;
-	
+	LocalTime previousLocalTimeBegin;
+	LocalTime previousLocalTimeEnd;
+	Long previousSpeechMillis;
+	LocalTime currentLocalTimeBegin;
+	LocalTime currentLocalTimeEnd;	
+	Long currentSpeechMillis;
+		
+	String previousSpeaker;
+	String currentSpeaker;	
+	boolean firstSpeaker;
 	String filenameWithoutExtension;
+	//Boolean isVtt;
 	
 	final static String NARRADOR = "NARRADOR";
 	final static String SPEAKER = "SPEAKER";
@@ -77,7 +75,20 @@ public class RttmCommand implements Callable<Integer> {
 		}
 	}
 	 
-
+	private void initializeProperties() {
+		this.previousLocalTimeBegin = null;
+		this.previousLocalTimeEnd = null;
+		this.currentLocalTimeBegin = null;
+		this.currentLocalTimeEnd = null;
+		this.previousSpeaker = null;
+		this.currentSpeaker = null;
+		this.previousSpeechMillis = 0L;
+		this.currentSpeechMillis = 0L;
+		this.firstSpeaker = false;
+		this.filenameWithoutExtension = null;
+	}
+	
+	
 	/**
 	 * Produce una linea de texto RTTM en el archivo de salida
 	 * @param bufferWriter
@@ -88,8 +99,16 @@ public class RttmCommand implements Callable<Integer> {
 			System.out.println("Parece que se ha producido un Overlapping con los speakers: "+previousSpeaker + " y " +currentSpeaker);
 			return;
 		}
-		String turnOnset = previousLocalTimeBegin.toSecondOfDay() + "." + previousLocalTimeBegin.get(ChronoField.MILLI_OF_SECOND);
-		String turnDuration = Math.abs(previousSpeechMillis/1000) + "." + (previousSpeechMillis%1000);  
+		String turnOnset = previousLocalTimeBegin.toSecondOfDay() 
+				+ "." 
+				+ ( previousLocalTimeBegin.get(ChronoField.MILLI_OF_SECOND) < 100 
+						? "0" + (previousLocalTimeBegin.get(ChronoField.MILLI_OF_SECOND)) 
+						: (previousLocalTimeBegin.get(ChronoField.MILLI_OF_SECOND))); 				
+		String turnDuration = Math.abs(previousSpeechMillis/1000)  
+				+ "." 
+				+ ( (previousSpeechMillis%1000) <100 
+						? "0" + (previousSpeechMillis%1000) 
+						: (previousSpeechMillis%1000));
 		// Consideramos que hay un gap entre ambos speechs, así que ESCRIBIMOS una linea en el archivo RTTM
 		StringBuilder newLine = new StringBuilder(SPEAKER).append(SEPARATOR)
 				.append(filenameWithoutExtension).append(SEPARATOR)
@@ -122,7 +141,7 @@ public class RttmCommand implements Callable<Integer> {
         		this.currentLocalTimeEnd = LocalTime.parse(timeStrEnd, dtFormatter);
         		this.currentSpeechMillis = currentLocalTimeBegin.until(currentLocalTimeEnd, ChronoUnit.MILLIS );
         	}else {
-        			this.previousLocalTimeBegin = this.currentLocalTimeBegin;  
+        			this.previousLocalTimeBegin = this.currentLocalTimeBegin;
         			this.previousLocalTimeEnd = this.currentLocalTimeEnd;		
         			this.currentLocalTimeBegin = LocalTime.parse(timeStrBegin, dtFormatter);
         			this.currentLocalTimeEnd = LocalTime.parse(timeStrEnd, dtFormatter);
@@ -161,6 +180,7 @@ public class RttmCommand implements Callable<Integer> {
         
 	@Override
 	public Integer call() throws Exception {
+		initializeProperties();
         String line = null;
         FileReader reader = null;
         FileWriter writer = null;
@@ -182,7 +202,7 @@ public class RttmCommand implements Callable<Integer> {
         BufferedWriter bufferWriter = new BufferedWriter(writer, 1000);
         Pattern rangeTimePattern = Pattern.compile("(\\d{2}:\\d{2}:\\d{2}[,\\.]\\d{3})(\\s-->\\s)(\\d{2}:\\d{2}:\\d{2}[,\\.]\\d{3})");
         Pattern speakerPattern = Pattern.compile("^\\([A-Z\\s\\-,.\\:]+\\).*$");
-        Pattern sentenceWithoutSpeakerLabeledPattern = Pattern.compile("^(?!\\()[A-Za-zÑñ\\sá-úà-ùä-üâ-ûÁ-ÚÀ-ÙÄ-ÜÂ-Û[0-9]\\.,;\\:\\-¿\\?\\\"\\'\\`\\*\\+]+$");
+        Pattern sentenceWithoutSpeakerLabeledPattern = Pattern.compile("^(?!\\()[A-Za-zÑñ\\sá-úà-ùä-üâ-ûÁ-ÚÀ-ÙÄ-ÜÂ-Û[0-9]\\.,;\\:\\-\\?¿\\!¡\\\"\\'\\`\\*\\+]+$");
         Pattern formasHablarPattern = Pattern.compile("("+FormasHablar.getValues() +")");
         
         int timedlinesCount = 0, textlinesCount = 0, noContentLinesCount=0,  totallinesCount=0;
@@ -198,7 +218,7 @@ public class RttmCommand implements Callable<Integer> {
                 	line = line.trim();
                 	Matcher rangeTimeMatcher = rangeTimePattern.matcher(line);
                 	Matcher speakerMatcher = speakerPattern.matcher(line);                	
-                	Matcher sentenceWithoutSpeakermatcher = sentenceWithoutSpeakerLabeledPattern.matcher(line);
+                	Matcher sentenceWithoutSpeakerMatcher = sentenceWithoutSpeakerLabeledPattern.matcher(line);
                     if (rangeTimeMatcher.matches()){
                     	timedlinesCount++;
                     	System.out.println("Range time line is matched:"+line);		                    	
@@ -244,7 +264,7 @@ public class RttmCommand implements Callable<Integer> {
                     		System.out.println("ERROR..SEGUNDO ETIQUETADO CONSECUTIVO Continua hablando el actual: "+speaker);
                     		speechNormalLine(bufferWriter);
                     	}	                    	
-                    }else if (sentenceWithoutSpeakermatcher.matches()) {
+                    }else if (sentenceWithoutSpeakerMatcher.matches()) {
                     	textlinesCount++;
                     	if (!firstSpeaker) { //En el primer Speech, como no sabemos quien habla, supondremos que es el narrador
                     		firstSpeaker = true;
@@ -255,7 +275,7 @@ public class RttmCommand implements Callable<Integer> {
                     	}
                     }else {
                    	 	noContentLinesCount++;
-                   	 	System.out.println("Numero de linea no clasificada: "+totallinesCount);
+                   	 	System.out.println("La línea número "+totallinesCount+ " NO SE HA PODIDO CLASIFICAR. ");
                     }
                  }else 
                 	 noContentLinesCount++;
@@ -278,6 +298,8 @@ public class RttmCommand implements Callable<Integer> {
         }	    
 		return 0;
 	}
+
+
 	
 		
 }

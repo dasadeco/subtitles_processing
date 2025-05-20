@@ -3,6 +3,9 @@ import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -16,7 +19,7 @@ public class UnitTest {
 	Pattern speakerPattern = Pattern.compile("\\([A-Z\\s\\-,.\\:]+\\).*");
 	
 	@Test
-	public void testHola (){				
+	public void testSpeakerMatcher (){				
         String line = null;
         FileReader reader = null;
 		try {
@@ -31,7 +34,6 @@ public class UnitTest {
             try {
 				line = buffer.readLine();
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
             if (line!=null && StringUtils.isNotBlank(line)){
@@ -53,8 +55,20 @@ public class UnitTest {
         	    	System.out.println(speaker);
         		}	
             }
-        }while (line!=null);  
-
-		
+        }while (line!=null);  		
 	}
+	
+	
+	@Test
+	public void testFileWalker (){
+        Path start = Paths.get("./data/subtitles");
+        
+        try {
+            Files.walk(start)
+                 .forEach(System.out::println);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+	}
+	
 }

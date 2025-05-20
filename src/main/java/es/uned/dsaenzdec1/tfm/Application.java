@@ -1,6 +1,15 @@
 package es.uned.dsaenzdec1.tfm;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.ExitCodeGenerator;
 import org.springframework.boot.SpringApplication;
@@ -17,7 +26,8 @@ public class Application implements CommandLineRunner, ExitCodeGenerator {
 	private int exitCode;
 	
 	private enum Action {
-		diarization,
+		generaRTTMRef,
+		generaAllRTTMRef,
 		aligning_sub;		
 	}	
 	
@@ -31,12 +41,43 @@ public class Application implements CommandLineRunner, ExitCodeGenerator {
 		this.subtitles = subtCommand;
 		this.rttm = rttmCommand;
 	}
+	
+	public void process_subtitles_folders(String... args) {
+        Path subtitlesPath = Paths.get("./data/subtitles");        
+        Path rttmRefsPath = Paths.get("./data/rttm_ref");
+        
+        try {
+			Files.deleteIfExists(rttmRefsPath);
+			Files.createDirectories(rttmRefsPath);
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.out.println(String.format("Error de entrada/salida con el path %s: %s", subtitlesPath, e.getCause()));
+		}
+        
+        Map<String, Integer> exitCodes = new HashMap<>(); 
+        try {
+            Files.walk(subtitlesPath)
+                 .filter(subtitleFile-> subtitleFile.toString().endsWith(".srt") || subtitleFile.toString().endsWith(".vtt"))
+                 .forEach(subtitleFile -> {
+                	 String outputFileName = rttmRefsPath.resolve( Paths.get(subtitleFile.toString().substring(0, subtitleFile.toString().lastIndexOf(".")).concat(".rttm")).getFileName()).toString();                	 
+                	 List<String> argsList = new ArrayList<String>(Arrays.asList(args));
+                	 argsList.add("-i=" + subtitleFile.toString());
+                	 argsList.add("-o=" + outputFileName.toString());
+                	 exitCodes.put(outputFileName, new CommandLine(rttm, factory).execute(argsList.stream().toArray(String[]::new)));                		 
+                 });
+                 
+        } catch (IOException e) {
+            e.printStackTrace();
+        }		
+	}
 
 	@Override
 	public void run(String... args) throws Exception {
-		if (args[0].equals(Action.diarization.toString()))
-			exitCode = new CommandLine(rttm, factory).execute(Arrays.asList(args).stream().skip(1).toArray(String[]::new));			
-		else
+		if (args[0].equals(Action.generaRTTMRef.toString()))
+			exitCode = new CommandLine(rttm, factory).execute(Arrays.asList(args).stream().skip(1).toArray(String[]::new));		
+		else if (args[0].equals(Action.generaAllRTTMRef.toString())) {
+			process_subtitles_folders(Arrays.asList(args).stream().skip(1).toArray(String[]::new));			
+		}else
 			if (args[0].equals(Action.aligning_sub.toString()))
 				exitCode = new CommandLine( subtitles, factory).execute(Arrays.asList(args).stream().skip(1).toArray(String[]::new));
 			else

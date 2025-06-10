@@ -133,8 +133,8 @@ public class RttmCommand implements Callable<Integer> {
 	 * @param lineInt
 	 * @throws IOException
 	 */
-    private void calculateMillisRangeTime(String timeStrBegin, String timeStrEnd, BufferedWriter bufferWriter, int lineInt) throws IOException {
-    	DateTimeFormatter dtFormatter = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
+    private void calculateMillisRangeTime(String timeStrBegin, String timeStrEnd, BufferedWriter bufferWriter, int lineInt) throws IOException {    	
+		DateTimeFormatter dtFormatter = DateTimeFormatter.ofPattern("HH:mm:ss" + timeStrBegin.charAt(8) + "SSS");
     	if ( StringUtils.isNotBlank(timeStrBegin) && StringUtils.isNotBlank(timeStrEnd)) {         	
         	if (this.currentLocalTimeBegin==null) { //Es el primer rango de LocalTimes del hablante
         		this.currentLocalTimeBegin = LocalTime.parse(timeStrBegin, dtFormatter);
@@ -186,8 +186,9 @@ public class RttmCommand implements Callable<Integer> {
         FileWriter writer = null;
 		try {
 			reader = new FileReader(filenameIn);
-			filenameWithoutExtension = filenameIn.getName().substring(0, filenameIn.getName().lastIndexOf("."));
+			filenameWithoutExtension = filenameIn.getName().substring(0, filenameIn.getName().lastIndexOf(".")).replace(" ", "_");
 			//isVtt = filenameIn.getName().toLowerCase().endsWith(".vtt");
+			filenameOut = new File(filenameOut.getPath().replace(" ", "_"));
 			filenameOut.createNewFile();				
 			writer = new FileWriter(filenameOut);
 		} catch (FileNotFoundException e1) {

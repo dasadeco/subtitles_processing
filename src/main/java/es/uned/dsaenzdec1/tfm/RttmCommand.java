@@ -46,7 +46,6 @@ public class RttmCommand implements Callable<Integer> {
 	String currentSpeaker;	
 	boolean firstSpeaker;
 	String filenameWithoutExtension;
-	//Boolean isVtt;
 	
 	final static String NARRADOR = "NARRADOR";
 	final static String SPEAKER = "SPEAKER";
@@ -133,7 +132,7 @@ public class RttmCommand implements Callable<Integer> {
 	 * @param lineInt
 	 * @throws IOException
 	 */
-    private void calculateMillisRangeTime(String timeStrBegin, String timeStrEnd, BufferedWriter bufferWriter, int lineInt) throws IOException {    	
+    private void calculateMillisRangeTime(String timeStrBegin, String timeStrEnd, int lineInt) throws IOException {    	
 		DateTimeFormatter dtFormatter = DateTimeFormatter.ofPattern("HH:mm:ss" + timeStrBegin.charAt(8) + "SSS");
     	if ( StringUtils.isNotBlank(timeStrBegin) && StringUtils.isNotBlank(timeStrEnd)) {         	
         	if (this.currentLocalTimeBegin==null) { //Es el primer rango de LocalTimes del hablante
@@ -187,7 +186,6 @@ public class RttmCommand implements Callable<Integer> {
 		try {
 			reader = new FileReader(filenameIn);
 			filenameWithoutExtension = filenameIn.getName().substring(0, filenameIn.getName().lastIndexOf(".")).replace(" ", "_");
-			//isVtt = filenameIn.getName().toLowerCase().endsWith(".vtt");
 			filenameOut = new File(filenameOut.getPath().replace(" ", "_"));
 			filenameOut.createNewFile();				
 			writer = new FileWriter(filenameOut);
@@ -206,12 +204,12 @@ public class RttmCommand implements Callable<Integer> {
         Pattern sentenceWithoutSpeakerLabeledPattern = Pattern.compile("^(?!\\()[A-Za-zÑñ\\sá-úà-ùä-üâ-ûÁ-ÚÀ-ÙÄ-ÜÂ-Û[0-9]\\.,;\\:\\-\\?¿\\!¡\\\"\\'\\`\\*\\+]+$");
         Pattern formasHablarPattern = Pattern.compile("("+FormasHablar.getValues() +")");
         
-        int timedlinesCount = 0, textlinesCount = 0, noContentLinesCount=0,  totallinesCount=0;
+        int timedLinesCount = 0, textLinesCount = 0, noContentLinesCount=0,  totalLinesCount=0;
         try{
             do { 
                 line = buffer.readLine();
-                totallinesCount++;
-                if (line!=null && StringUtils.isNotBlank(line) && !WEBVTT.equals(line.trim()) && !line.trim().matches("^\\d{1,}$")){ 
+                totalLinesCount++;
+                if (line!=null && StringUtils.isNotBlank(line) && !line.trim().matches(".*"+WEBVTT+".*") && !line.trim().matches("^\\d{1,}$")){ 
                 	//  * no hemos llegado al final del fichero
                 	//  * la línea no es vacía
                 	//  * No contiene únicamente WEBVTT como ocurre con los .vtt
@@ -221,11 +219,11 @@ public class RttmCommand implements Callable<Integer> {
                 	Matcher speakerMatcher = speakerPattern.matcher(line);                	
                 	Matcher sentenceWithoutSpeakerMatcher = sentenceWithoutSpeakerLabeledPattern.matcher(line);
                     if (rangeTimeMatcher.matches()){
-                    	timedlinesCount++;
+                    	timedLinesCount++;
                     	System.out.println("Range time line is matched:"+line);		                    	
-                    	calculateMillisRangeTime(rangeTimeMatcher.group(1), rangeTimeMatcher.group(3), bufferWriter, totallinesCount);
+                    	calculateMillisRangeTime(rangeTimeMatcher.group(1), rangeTimeMatcher.group(3), totalLinesCount);
                     }else if (speakerMatcher.matches()) {
-                    	textlinesCount++;
+                    	textLinesCount++;
             	    	String speakerLine = speakerMatcher.group();
             	    	String speaker = speakerLine.substring(1, speakerLine.indexOf(")"));
             	    	
@@ -266,7 +264,7 @@ public class RttmCommand implements Callable<Integer> {
                     		speechNormalLine(bufferWriter);
                     	}	                    	
                     }else if (sentenceWithoutSpeakerMatcher.matches()) {
-                    	textlinesCount++;
+                    	textLinesCount++;
                     	if (!firstSpeaker) { //En el primer Speech, como no sabemos quien habla, supondremos que es el narrador
                     		firstSpeaker = true;
                     		currentSpeaker = NARRADOR;
@@ -276,7 +274,7 @@ public class RttmCommand implements Callable<Integer> {
                     	}
                     }else {
                    	 	noContentLinesCount++;
-                   	 	System.out.println("La línea número "+totallinesCount+ " NO SE HA PODIDO CLASIFICAR. ");
+                   	 	System.out.println("La línea número "+totalLinesCount+ " NO SE HA PODIDO CLASIFICAR. ");
                     }
                  }else 
                 	 noContentLinesCount++;
@@ -292,15 +290,11 @@ public class RttmCommand implements Callable<Integer> {
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
-            System.out.println("Total de lineas:" + totallinesCount);
-            System.out.println("Lineas de tiempo: "+timedlinesCount);
-            System.out.println("Lineas con texto: "+textlinesCount);
+            System.out.println("Total de lineas:" + totalLinesCount);
+            System.out.println("Lineas de tiempo: "+timedLinesCount);
+            System.out.println("Lineas con texto: "+textLinesCount);
             System.out.println("Resto de Lineas: " +noContentLinesCount);
         }	    
 		return 0;
-	}
-
-
-	
-		
+	}		
 }

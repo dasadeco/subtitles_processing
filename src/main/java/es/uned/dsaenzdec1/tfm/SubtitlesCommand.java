@@ -81,7 +81,7 @@ public class SubtitlesCommand implements Callable<Integer> {
 			String filenameOutName;
 			if (filenameOut==null) {
 				filenameOutName = filenameIn.getName().substring(0, filenameIn.getName().lastIndexOf(".")).concat("_2.srt");
-				filenameOut = new File(filenameOutName);
+				filenameOut = new File(filenameIn.getParent(), filenameOutName);
 			}
 			filenameOut.createNewFile();				
 			writer = new FileWriter(filenameOut);

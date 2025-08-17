@@ -55,6 +55,11 @@ public class UnitTest {
         		}	
             }
         }while (line!=null);  		
+        try {
+			buffer.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 	
 	

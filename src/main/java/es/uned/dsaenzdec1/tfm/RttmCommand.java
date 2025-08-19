@@ -116,7 +116,7 @@ public class RttmCommand implements Callable<Integer> {
 				.append(turnDuration).append(SEPARATOR)
 				.append(NA).append(SEPARATOR)
 				.append(NA).append(SEPARATOR)
-				.append(previousSpeaker).append(SEPARATOR)
+				.append(previousSpeaker.toUpperCase()).append(SEPARATOR)
 				.append(NA).append(SEPARATOR)
 				.append(NA).append(SEPARATOR);
 		bufferWriter.write(newLine.toString());
@@ -200,7 +200,7 @@ public class RttmCommand implements Callable<Integer> {
         BufferedReader buffer = new BufferedReader(reader, 1000);
         BufferedWriter bufferWriter = new BufferedWriter(writer, 1000);
         Pattern rangeTimePattern = Pattern.compile("(\\d{2}:\\d{2}:\\d{2}[,\\.]\\d{3})(\\s-->\\s)(\\d{2}:\\d{2}:\\d{2}[,\\.]\\d{3})");
-        Pattern speakerPattern = Pattern.compile("^\\([A-Z\\s\\-,.\\:]+\\).*$");
+        Pattern speakerPattern = Pattern.compile("^\\([A-Za-z0-9\\s\\-,\\._\\:]+\\).*$");
         Pattern sentenceWithoutSpeakerLabeledPattern = Pattern.compile("^(?!\\()[A-Za-zÑñ\\sá-úà-ùä-üâ-ûÁ-ÚÀ-ÙÄ-ÜÂ-Û[0-9]\\.,;\\:\\-\\?¿\\!¡\\\"\\'\\`\\*\\+]+$");
         Pattern formasHablarPattern = Pattern.compile("("+FormasHablar.getValues() +")");
         

@@ -2,6 +2,7 @@ package es.uned.dsaenzdec1.tfm;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -25,6 +26,15 @@ public class Application implements CommandLineRunner, ExitCodeGenerator {
 	private RttmCommand rttm;
 	private EvalUneCommand evalUne;
 	private int exitCode;
+	
+	static Path subtitlesPath = Paths.get("./data/subtitles");
+	static Path rttmRefsPath = Paths.get("./data/rttm_ref");
+	public static Path rttmsPath = Paths.get("./media/rttm");	
+	
+	final private static String SUBTITLES_PATH = "subtitlesPath";
+	final private static String RTTM_REFS_PATH = "rttmRefsPath";
+	final private static String RTTMS_PATH = "rttmsPath";
+	final public static String UNE_METRICS_FILE = "UNE_METRICS.txt";
 
 	private enum Action {
 		generaRTTMRef, generaAllRTTMRef, evalUne, evalAllUne, aligning_sub;
@@ -43,9 +53,6 @@ public class Application implements CommandLineRunner, ExitCodeGenerator {
 	}
 
 	public void process_subtitles_folders(String... args) {
-		Path subtitlesPath = Paths.get("./data/subtitles");
-		Path rttmRefsPath = Paths.get("./data/rttm_ref");
-		Path rttmsPath = Paths.get("./media/rttm");
 		Boolean generate;
 		switch (Action.valueOf(args[0])) {
 		case generaAllRTTMRef:
@@ -56,18 +63,21 @@ public class Application implements CommandLineRunner, ExitCodeGenerator {
 			generate = false;
 		}
 		try {
-			if (Files.notExists(rttmRefsPath))
-				Files.createDirectories(rttmRefsPath);
 			if (generate) {
+				if (Files.notExists(rttmRefsPath))
+					Files.createDirectories(rttmRefsPath);				
 				Files.walk(rttmRefsPath).filter(rttmFile -> rttmFile.toString().endsWith(".rttm")).forEach(rttmFile -> {
 					try {
 						Files.delete(rttmFile);
 					} catch (IOException e) {
 						e.printStackTrace();
-						System.out.println(String.format("Error de entrada/salida con el path %s: %s", rttmRefsPath,
-								e.getCause()));
+						System.out.println(String.format("Error de entrada/salida con el path %s: %s", rttmRefsPath, e.getCause()));
 					}
 				});
+			}else {
+				if (Files.exists(Paths.get( Application.rttmsPath.toString(), UNE_METRICS_FILE), LinkOption.NOFOLLOW_LINKS)) {
+					Files.delete(Paths.get( Application.rttmsPath.toString(), UNE_METRICS_FILE)); // Reiniciamos el archivo de métricas UNE pues comienza un nuevo proceso
+				}
 			}
 
 		} catch (IOException e) {
@@ -77,7 +87,6 @@ public class Application implements CommandLineRunner, ExitCodeGenerator {
 		}
 
 		Map<String, Integer> exitCodes = new HashMap<>();
-
 		try {
 			if (generate) {
 				Files.walk(subtitlesPath, 1).filter(subtitleFile -> subtitleFile.toString().endsWith(".srt")
@@ -122,10 +131,10 @@ public class Application implements CommandLineRunner, ExitCodeGenerator {
 							}
 						});
 			} else {
-				Files.walk(rttmsPath, 2).filter(path -> Files.isDirectory(path) && !path.getFileName().toString().equals("rttm"))
+				Files.walk(rttmsPath, 1).filter(path -> Files.isDirectory(path) && !path.getFileName().toString().equals("rttm"))
 						.forEach(datasetPath -> {
 							try {
-								Files.walk(datasetPath).filter(rttmFile -> rttmFile.toString().endsWith(".rttm"))
+								Files.walk(datasetPath, 2).filter(rttmFile -> rttmFile.toString().endsWith(".rttm"))
 										.forEach(rttmFile -> {
 											evalUneCommandFromSubtitleAndRttm(rttmFile, subtitlesPath, exitCodes, args);
 										});
@@ -206,9 +215,9 @@ public class Application implements CommandLineRunner, ExitCodeGenerator {
 		Path inputSubtitleFile = getSubtitleFromRttm(inputRttmFile, inputSubtitlePath, exitCodes);		
 		if (inputSubtitleFile!=null) {
 			argsList.add("-is=" + inputSubtitleFile);
-			if (exitCodes.get(inputSubtitleFile.toString())!= null && exitCodes.get(inputSubtitleFile.toString())==2) {
+			/*if (exitCodes.get(inputSubtitleFile.toString())!= null && exitCodes.get(inputSubtitleFile.toString())==2) {
 				argsList.add("-lab=true");
-			}
+			}*/
 		}
 		argsList.add("-ir=" + inputRttmFile.toString());
 		
@@ -249,7 +258,27 @@ public class Application implements CommandLineRunner, ExitCodeGenerator {
 	 */
 	public static void main(String[] args) {
 		String[] filteredArgs = Arrays.asList(args).stream()
-				.filter(arg -> !arg.equals("--debug") && !arg.startsWith("--spring.")).toArray(String[]::new);
+				.filter(arg -> !arg.equals("--debug") && !arg.startsWith("--spring."))
+				.peek(arg -> {
+					if (arg.endsWith("Path")) {
+						String[] argsArr = arg.split("=");
+						String argkey = null;
+						if (argsArr.length == 2) {							
+							argkey = argsArr[0].replace("-", "");
+							if (argkey != null)
+								switch(argkey) 
+								   {case SUBTITLES_PATH:
+									   subtitlesPath = Paths.get(argsArr[1]);
+									   break;
+								   	case RTTM_REFS_PATH:
+									   rttmRefsPath = Paths.get(argsArr[1]);
+									   break;
+								   	case RTTMS_PATH:
+								   	   rttmsPath = Paths.get(argsArr[1]);	
+								   }
+						}
+					};
+				}).toArray(String[]::new);
 		System.exit(SpringApplication.exit(SpringApplication.run(Application.class, filteredArgs)));
 	}
 

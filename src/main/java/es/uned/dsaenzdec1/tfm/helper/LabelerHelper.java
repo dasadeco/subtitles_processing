@@ -7,7 +7,6 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoField;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -18,9 +17,11 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 
 import lombok.Data;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.Value;
 
 @Component
@@ -30,7 +31,8 @@ public class LabelerHelper {
 	final static String WEBVTT = "WEBVTT";
 	
 	private static Pattern rangeTimePattern = Pattern.compile("(\\d{2}:\\d{2}:\\d{2}[,\\.]\\d{3})(\\s-->\\s)(\\d{2}:\\d{2}:\\d{2}[,\\.]\\d{3})");
-	private static Pattern speakerPattern = Pattern.compile("^\\([A-Zaa-z0-9\\s\\-_\\,\\.\\:]+\\).*$");
+	private static Pattern speakerPattern = Pattern.compile("^\\s*(\\([A-Za-z0-9\\s\\-_\\,\\.\\:]+\\)).*$");
+	private static Pattern onlySpeakerPattern = Pattern.compile("\\([A-Za-z0-9\\s\\-_\\,\\.\\:]+\\)");
 	private static Pattern sentenceWithoutSpeakerLabeledPattern = Pattern.compile("^(?!\\()[A-Za-zÑñ\\sá-úà-ùä-üâ-ûÁ-ÚÀ-ÙÄ-ÜÂ-Û[0-9]ºª\\.,;\\:\\-\\?¿\\!¡\\\"\\'\\`\\*\\+]+$");
 	
 	private String currentIntervalSubtitleLine = null;
@@ -38,7 +40,7 @@ public class LabelerHelper {
 	private String lastSpeaker = null;
 	private Matcher lastRangeTimeMatcher = null;
 	
-	@Getter
+	@Getter @Setter
 	List<ParsedRttmLine> parsedRttmLinesList = null;
 	private Set<String> speakersSet = null;
 	
@@ -50,10 +52,10 @@ public class LabelerHelper {
 	 * @return Resultado de la operación 0=OK, 1=KO
 	 * @throws IOException 
 	 */
-	public int doLabelSubtitle(BufferedReader bufferSubtitleIn, BufferedReader bufferRttmIn, BufferedWriter bufferWriter, Boolean cumplir6_7){
+	public int doLabelSubtitle(BufferedReader bufferSubtitleIn, BufferedReader bufferRttmIn, BufferedWriter bufferWriter, Boolean cumplir6_7) throws IOException{
 		speakersSet = new HashSet<String>();
 		String subtitleLine = null;				
-		int subTimeIntervalLinesCount = 0, subTextLinesCount = 0, subNoContentLinesCount=0, subTotalLinesCount= 0;		
+		int subTimeIntervalLinesCount = 0, subTextLinesCount = 0, subNoContentLinesCount=0, subTotalLinesCount= 0;
 		try {
 			parseAllRttmFile(bufferRttmIn);
 		} catch (IOException e) {
@@ -89,7 +91,7 @@ public class LabelerHelper {
 	                	if (currentIntervalSubtitleLine != null) {
 	                		String suitableSpeaker = searchMoreSuitableRttmLine();
 	                		lastSpeaker = currentSpeaker;
-	                		currentSpeaker = suitableSpeaker;
+	                		currentSpeaker = suitableSpeaker.toUpperCase();
 	                		String currentSpeakerAbbrev = new String("" + currentSpeaker.charAt(0)+ currentSpeaker.charAt(currentSpeaker.length()-1));
 	                		if ((lastSpeaker!=null && (!lastSpeaker.equals(suitableSpeaker)) && !lastSpeaker.equals(currentSpeakerAbbrev)) || lastSpeaker==null) {	                					                				                				                		
 		                		if (BooleanUtils.isTrue(cumplir6_7)) {			                		 
@@ -124,7 +126,7 @@ public class LabelerHelper {
             	    		currentIntervalSubtitleLine = null;
             	    	}*/
             	    	lastSpeaker = currentSpeaker;
-            	    	currentSpeaker = speaker;
+            	    	currentSpeaker = speaker.toUpperCase();
                     }else {
                     	subNoContentLinesCount++;
                    	 	System.out.println("La línea número "+subTotalLinesCount+ " NO SE HA PODIDO CLASIFICAR. ");
@@ -138,29 +140,76 @@ public class LabelerHelper {
                	 	bufferWriter.newLine();               	 	
                 }								
 			}while(subtitleLine != null);
-		 subTotalLinesCount--;
-		 bufferSubtitleIn.close();
+		 subTotalLinesCount--;		 
 		}catch (IOException ioe) {
             System.out.println(ioe.getMessage());
             return 1;
+        }finally{
+        	bufferSubtitleIn.close();
+        	bufferRttmIn.close();
+        	bufferWriter.close();
+            System.out.println("Total de lineas:" + subTotalLinesCount);
+            System.out.println("Lineas de tiempo: "+subTimeIntervalLinesCount);
+            System.out.println("Lineas con texto: "+subTextLinesCount);
+            System.out.println("Resto de Lineas: " +subNoContentLinesCount);        	
         }
-        System.out.println("Total de lineas:" + subTotalLinesCount);
-        System.out.println("Lineas de tiempo: "+subTimeIntervalLinesCount);
-        System.out.println("Lineas con texto: "+subTextLinesCount);
-        System.out.println("Resto de Lineas: " +subNoContentLinesCount);
         return 0;
 	}
 	
+	
 	/**
-	 * Asigna el último intervalo de tiempo leido del archivo de subtítulo
-	 * @param timeStrBegin
-	 * @param timeStrEnd
+	 * Elimina el etiquetado previo de un archivo de subtítulso antes de realizar uno nuevo
+	 * @param bufferSubtitleIn
+	 * @param writer
+	 * @return Resultado de la operación 0=OK, 1=KO
+	 * @throws IOException 
 	 */
-//	private void setCurrentSubtitleLocalTime(String timeStrBegin, String timeStrEnd) {
-//		DateTimeFormatter dtFormatter = DateTimeFormatter.ofPattern("HH:mm:ss" + timeStrBegin.charAt(8) + "SSS");
-//		currentSubtitleLocalTimeBegin = LocalTime.parse(timeStrBegin, dtFormatter);
-//		currentSubtitleLocalTimeEnd = LocalTime.parse(timeStrEnd, dtFormatter);
-//	}	
+	public int doUnlabelSubtitle(BufferedReader bufferSubtitleIn, BufferedWriter bufferWriter) throws IOException{
+		String line = null;
+		int labeledLines = 0, remainingLines = 0;
+		try {
+	        do {       
+	            line = bufferSubtitleIn.readLine();
+	            if (line!=null && StringUtils.isNotBlank(line) && !WEBVTT.equals(line.trim()) && !line.trim().matches("^\\d{1,}$")){ 
+	            	//  * no hemos llegado al final del fichero, la línea no es vacía, no contiene únicamente WEBVTT como ocurre con los .vtt
+	            	//  * No es un indice numérico de la entrada de subtítulo como ocurre con los .srt
+	            	line = line.trim();
+	            	Matcher speakerMatcher = onlySpeakerPattern.matcher(line);
+	            	
+	            	if (speakerMatcher.find()) {
+	            		int start = speakerMatcher.toMatchResult().start();
+	            		int end = speakerMatcher.toMatchResult().end();
+	            		labeledLines++;  
+            	    	String newLineSubtitle = line.substring(0, start).concat(line.substring(end));
+	                    bufferWriter.write(newLineSubtitle);
+						bufferWriter.newLine();
+	            	}else {
+	            		remainingLines++;
+	                    bufferWriter.write(line);
+						bufferWriter.newLine();	            		
+	            	}
+            	}else {
+            		remainingLines++;
+            		if (line!=null) {
+	                    bufferWriter.write(line);
+						bufferWriter.newLine();
+            		}
+            	}
+	        }while (line!=null);
+	         
+	    } catch (Exception exc) {
+	           System.out.println(exc.getMessage()); 
+	           return 1;
+	    }finally {
+	    	bufferSubtitleIn.close();
+	    	bufferWriter.close();
+	    }
+    	System.out.println("Lineas etiquetadas: "+labeledLines);
+    	System.out.println("Resto de Lineas: " +remainingLines);	      	  
+	    return 0;
+	}
+	
+	
 	
 	/**
 	 * Busca la linea del archivo RTTM más similar en el intervalo de tiempo a la actual del archivo de subtítulos.
@@ -171,7 +220,6 @@ public class LabelerHelper {
 	private String searchMoreSuitableRttmLine(){
 		
     	if ( StringUtils.isNotBlank(lastRangeTimeMatcher.group(1)) && StringUtils.isNotBlank(lastRangeTimeMatcher.group(3))) {
-    		//setCurrentSubtitleLocalTime(rangeTimeMatcher.group(1), rangeTimeMatcher.group(3));
     		DateTimeFormatter dtFormatter = DateTimeFormatter.ofPattern("HH:mm:ss" + lastRangeTimeMatcher.group(1).charAt(8) + "SSS");
     		LocalTime currentSubtitleLocalTimeBegin = LocalTime.parse(lastRangeTimeMatcher.group(1), dtFormatter);
     		LocalTime currentSubtitleLocalTimeEnd = LocalTime.parse(lastRangeTimeMatcher.group(3), dtFormatter);
@@ -213,11 +261,14 @@ public class LabelerHelper {
 	/**
 	 * Recorre el archivo RTTM una vez y guarda en una lista 
 	 * @param bufferRttmIn
+	 * @return 
 	 * @throws IOException
 	 */
-	public void parseAllRttmFile(BufferedReader bufferRttmIn) throws IOException {
+	public List<ParsedRttmLine> parseAllRttmFile(BufferedReader bufferRttmIn) throws IOException {
+		if (!CollectionUtils.isEmpty(parsedRttmLinesList))
+			return parsedRttmLinesList;
 		int rttmLinesOK = 0, rttmLinesKO = 0, rttmTotalLinesCount= 0;
-		parsedRttmLinesList = new ArrayList<>();
+		List<ParsedRttmLine> parsedRttmLinesList = new ArrayList<>();
 		String lineRttm = null;
 		do {
 			lineRttm = bufferRttmIn.readLine();
@@ -235,7 +286,9 @@ public class LabelerHelper {
 		}while(lineRttm!=null && !lineRttm.trim().isEmpty() );    		
         System.out.println("Total de lineas RTTM: " + rttmTotalLinesCount);
         System.out.println("Lineas RTTM OK: "+rttmLinesOK);
-        System.out.println("Lineas RTTM KO: "+rttmLinesKO);					
+        System.out.println("Lineas RTTM KO: "+rttmLinesKO);
+        setParsedRttmLinesList(parsedRttmLinesList);
+        return parsedRttmLinesList;
 	}
 	
 	/**
@@ -266,7 +319,7 @@ public class LabelerHelper {
 		}
 		int nanos = (millisSuma % 1000)*1000;
 		LocalTime currentRttmLocalTimeEnd = LocalTime.of(horas, minutos, segundos, nanos);
-		return new ParsedRttmLine(currentRttmLocalTimeBegin, currentRttmLocalTimeEnd, speaker);
+		return new ParsedRttmLine(currentRttmLocalTimeBegin, currentRttmLocalTimeEnd, speaker.toUpperCase());
 	}
 	
 	/**

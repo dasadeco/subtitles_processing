@@ -8,7 +8,7 @@
   </parent>
   <groupId>es.uned.dsaenzdec1.tfm</groupId>
   <artifactId>subtitles</artifactId>
-  <version>1.0-SNAPSHOT</version>
+  <version>1.1</version>
   <name>Subtitles</name>
   <dependencies>
 	  <dependency>
